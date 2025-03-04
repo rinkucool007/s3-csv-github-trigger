@@ -1,8 +1,11 @@
 # s3-csv-github-trigger
 
 Step-by-Step Guide with AWS Secrets Manager
+#
 Step 1: Create Secret in AWS Secrets Manager
+#
 Go to AWS Secrets Manager in the AWS Console
+#
 Click "Store a new secret"
 Select:
 Secret type: "Other type of secret"
