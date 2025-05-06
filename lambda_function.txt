@@ -11,7 +11,7 @@ def lambda_handler(event, context):
     print("Received event:", json.dumps(event, indent=2))
     
     try:
-        # Safely access bucket and key from event
+        # Validate event structure
         if 'Records' not in event or not event['Records']:
             raise ValueError("No Records found in event")
             
@@ -24,11 +24,24 @@ def lambda_handler(event, context):
         key = urllib.parse.unquote_plus(s3_data.get('object', {}).get('key', ''))
         
         if not bucket or not key:
-            raise ValueError("Bucket or key is missing from event")
+            raise ValueError(f"Missing bucket or key: bucket={bucket}, key={key}")
+        
+        # Verify S3 object exists and is accessible
+        try:
+            s3.head_object(Bucket=bucket, Key=key)
+        except s3.exceptions.ClientError as e:
+            error_code = e.response.get('Error', {}).get('Code')
+            raise Exception(f"Failed to access S3 object: {error_code}")
         
         # Get the object from S3
         response = s3.get_object(Bucket=bucket, Key=key)
-        file_content = response['Body'].read().decode('utf-8')
+        
+        # Try to read content with proper encoding handling
+        try:
+            file_content = response['Body'].read().decode('utf-8')
+        except UnicodeDecodeError:
+            print("File is not UTF-8 encoded, treating as binary")
+            file_content = "Binary file - cannot decode as text"
         
         # Process the file (example: print content)
         print(f"File {key} content: {file_content}")
@@ -39,7 +52,7 @@ def lambda_handler(event, context):
         }
         
     except Exception as e:
-        print(f"Error: {str(e)}")
+        print(f"Error details: {str(e)}")
         return {
             'statusCode': 500,
             'body': json.dumps(f'Error processing file: {str(e)}')
@@ -96,7 +109,8 @@ aws s3api put-bucket-notification-configuration \
         {
             "Effect": "Allow",
             "Action": [
-                "s3:GetObject"
+                "s3:GetObject",
+                "s3:HeadObject"
             ],
             "Resource": "arn:aws:s3:::your-bucket-name/*"
         }
